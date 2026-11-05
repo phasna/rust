@@ -26,6 +26,14 @@ cargo run --release -- data/04_common_parts.json 0412578440
 
 Si le numéro n'est pas dans le trie, le programme affiche `inconnu`.
 
+On peut aussi rechercher tous les contacts dont le numéro commence par un préfixe :
+
+```sh
+cargo run --release -- data/04_common_parts.json --prefix 0412
+# 0412578440 : Alice
+# 0412199803 : Bob
+```
+
 Et pour les tests :
 
 ```sh

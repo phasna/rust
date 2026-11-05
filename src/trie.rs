@@ -117,6 +117,34 @@ impl Trie {
         }
         node.name()
     }
+
+    /// Renvoie les numéros et noms dont le numéro commence par `prefix`.
+    pub fn search_prefix(&self, prefix: &str) -> Vec<(String, String)> {
+        let mut node = &self.root;
+        for digit in prefix.chars() {
+            let Some(child) = node.child(digit) else {
+                return Vec::new();
+            };
+            node = child;
+        }
+
+        let mut results = Vec::new();
+        let mut number = prefix.to_string();
+        collect_contacts(node, &mut number, &mut results);
+        results
+    }
+}
+
+fn collect_contacts(node: &Node, number: &mut String, results: &mut Vec<(String, String)>) {
+    if let Some(name) = node.name() {
+        results.push((number.clone(), name.to_string()));
+    }
+
+    for (digit, child) in node.children() {
+        number.push(*digit);
+        collect_contacts(child, number, results);
+        number.pop();
+    }
 }
 
 #[cfg(test)]
@@ -146,6 +174,32 @@ mod tests {
 
         assert_eq!(trie.get("113"), None);
         assert_eq!(trie.get("1123"), None);
+    }
+
+    #[test]
+    fn search_prefix_returns_matching_numbers_in_insertion_order() {
+        let mut trie = Trie::new();
+        trie.insert("0412", "Court").unwrap();
+        trie.insert("041257", "Alice").unwrap();
+        trie.insert("041298", "Bob").unwrap();
+        trie.insert("0512", "Autre").unwrap();
+
+        assert_eq!(
+            trie.search_prefix("0412"),
+            [
+                ("0412".to_string(), "Court".to_string()),
+                ("041257".to_string(), "Alice".to_string()),
+                ("041298".to_string(), "Bob".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn search_prefix_returns_empty_for_unknown_prefix() {
+        let mut trie = Trie::new();
+        trie.insert("112", "Urgences").unwrap();
+
+        assert!(trie.search_prefix("99").is_empty());
     }
 
     #[test]

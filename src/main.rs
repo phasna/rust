@@ -9,21 +9,29 @@ use phone_trie::plantuml::to_mindmap;
 use phone_trie::trie::Trie;
 
 const GRAPH_DIR: &str = "graph";
-const USAGE: &str = "usage : phone-trie <fichier.json> [numéro à rechercher]";
+const USAGE: &str = "usage : phone-trie <fichier.json> [numéro | --prefix préfixe]";
+
+enum SearchMode<'a> {
+    Exact(&'a str),
+    Prefix(&'a str),
+}
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
-    let (input, searched_number) = match args.as_slice() {
+    let (input, search) = match args.as_slice() {
         [input] => (input, None),
-        [input, number] => (input, Some(number)),
+        [input, number] => (input, Some(SearchMode::Exact(number))),
+        [input, flag, prefix] if flag == "--prefix" => {
+            (input, Some(SearchMode::Prefix(prefix)))
+        }
         _ => {
             eprintln!("{USAGE}");
             return ExitCode::FAILURE;
         }
     };
 
-    match run(Path::new(input), searched_number.map(String::as_str)) {
+    match run(Path::new(input), search) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("erreur : {error}");
@@ -32,7 +40,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(input: &Path, searched_number: Option<&str>) -> Result<(), Box<dyn Error>> {
+fn run(input: &Path, search: Option<SearchMode<'_>>) -> Result<(), Box<dyn Error>> {
     let json = fs::read_to_string(input).map_err(|e| format!("{}: {e}", input.display()))?;
     let contacts = parse_contacts(&json).map_err(|e| format!("{}: {e}", input.display()))?;
 
@@ -43,11 +51,22 @@ fn run(input: &Path, searched_number: Option<&str>) -> Result<(), Box<dyn Error>
     fs::write(&output, to_mindmap(&trie))?;
     println!("graphe généré : {}", output.display());
 
-    if let Some(number) = searched_number {
-        match trie.get(number) {
+    match search {
+        Some(SearchMode::Exact(number)) => match trie.get(number) {
             Some(name) => println!("{number} : {name}"),
             None => println!("{number} : inconnu"),
+        },
+        Some(SearchMode::Prefix(prefix)) => {
+            let results = trie.search_prefix(prefix);
+            if results.is_empty() {
+                println!("aucun numéro ne commence par {prefix}");
+            } else {
+                for (number, name) in results {
+                    println!("{number} : {name}");
+                }
+            }
         }
+        None => {}
     }
 
     Ok(())
